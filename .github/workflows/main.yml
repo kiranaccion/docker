@@ -1,21 +1,24 @@
-name: Trivy Scan Workflow
+name: build
 on:
- push:
-   branches:
-     - main
+  push:
+    branches:
+      - main
+  pull_request:
 jobs:
- trivy-scan:
-   runs-on: ubuntu-latest
-   steps:
-     - name: Checkout Code
-       uses: actions/checkout@v3
-     - name: Build Docker Image
-       run: docker build -t my-app:${{ github.sha }}
-     - name: Run Trivy Vulnerability Scanner
-       uses: aquasecurity/trivy-action@0.28.0
-       with:
-         image-ref: 'my-app:${{ github.sha }}'
-         format: 'table'
-         severity: 'CRITICAL,HIGH'
-         exit-code: 1
-         ignore-unfixed: true
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build an image from Dockerfile
+        run: docker build -t docker.io/my-organization/my-app:${{ github.sha }} .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: 'docker.io/my-organization/my-app:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
