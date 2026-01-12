@@ -17,8 +17,15 @@ jobs:
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: 'docker.io/library/hello-world:latest'
-          format: 'table'
+          format: 'html'
+          output: trivy-report.html
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+          
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-security-report
+          path: trivy-report.html
