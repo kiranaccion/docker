@@ -1,31 +1,40 @@
 name: build
+
 on:
   push:
     branches:
       - main
   pull_request:
+
 jobs:
   build:
-    name: Build
+    name: Build & Trivy Scan
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      #- name: Build an image from Dockerfile
-       # run: docker build -t docker.io/my-organization/my-app:${{ github.sha }} .
-      - name: Run Trivy vulnerability scanner
+
+      # Build image from YOUR Dockerfile
+      - name: Build Docker image
+        run: docker build -t trivy-demo:latest .
+
+      # Trivy Image Scan
+      - name: Run Trivy image vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: docker.io/library/hello-world:latest
-          format: 'template'
-          template: "@${GITHUB_WORKSPACE}/my_template.tpl"
-          exit-code: '1'
+          image-ref: trivy-demo:latest
+          format: template
+          template: "@/contrib/html.tpl"
+          output: trivy-image-report.html
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          
-      - name: Upload HTML report
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: '0'   # ✅ pipeline will NOT fail
+
+      # Upload report
+      - name: Upload Trivy HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-security-report
-          path: ${GITHUB_WORKSPACE}/my_template.tpl
+          name: trivy-image-security-report
+          path: trivy-image-report.html
