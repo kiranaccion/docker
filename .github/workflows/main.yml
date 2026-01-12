@@ -16,8 +16,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: "fs"
-          scan-ref: docker.io/library/hello-world:latest
+          image-ref: docker.io/library/hello-world:latest
           format: 'template'
           template: "@${GITHUB_WORKSPACE}/my_template.tpl"
           exit-code: '1'
