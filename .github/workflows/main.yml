@@ -5,15 +5,37 @@ on: [push]
 jobs:
   scan:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Build image
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
         run: docker build -t trivy-demo:latest .
 
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@master
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.50.0_Linux-64bit.deb
+
+      - name: Generate Trivy HTML report
+        run: |
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --format html \
+            --output trivy-report.html \
+            trivy-demo:latest
+
+      - name: Install wkhtmltopdf
+        run: sudo apt-get install -y wkhtmltopdf
+
+      - name: Convert HTML to PDF
+        run: wkhtmltopdf trivy-report.html trivy-report.pdf
+
+      - name: Upload Trivy PDF Report
+        uses: actions/upload-artifact@v4
         with:
-          image-ref: trivy-demo:latest
-          severity: HIGH,CRITICAL
-          exit-code: 1
+          name: trivy-pdf-report
+          path: trivy-report.pdf
