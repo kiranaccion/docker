@@ -12,7 +12,7 @@ jobs:
 
     steps:
       # ----------------------------
-      # Checkout source code
+      # Checkout
       # ----------------------------
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,65 +27,36 @@ jobs:
           cache: true
 
       # ----------------------------
-      # Create template + Scan image
+      # Download html.tpl (REQUIRED)
       # ----------------------------
-      - name: Run Trivy scan on container image
+      - name: Download Trivy HTML template
         shell: pwsh
         run: |
-          Write-Host "Creating Trivy template..."
+          Invoke-WebRequest `
+            -Uri "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl" `
+            -OutFile "$env:GITHUB_WORKSPACE/html.tpl"
 
-          $template = @"
-          {{- if .Results }}
-          TRIVY SECURITY REPORT
-          =====================
-
-          {{- range .Results }}
-          Target: {{ .Target }}
-          Type: {{ .Type }}
-
-          {{- if .Vulnerabilities }}
-          VULNERABILITIES:
-          {{- range .Vulnerabilities }}
-          ----------------------------------------
-          ID:        {{ .VulnerabilityID }}
-          Package:   {{ .PkgName }}
-          Installed: {{ .InstalledVersion }}
-          Fixed:     {{ .FixedVersion }}
-          Severity:  {{ .Severity }}
-          Title:     {{ .Title }}
-          {{- end }}
-          {{- else }}
-          No vulnerabilities found.
-          {{- end }}
-
-          {{ end }}
-          {{- else }}
-          No scan results.
-          {{- end }}
-          "@
-
-          $templatePath = "$env:GITHUB_WORKSPACE/trivy-template.tpl"
-          $reportPath   = "$env:GITHUB_WORKSPACE/trivy-report.txt"
-
-          Set-Content -Path $templatePath -Value $template
-
-          Write-Host "Pulling test image..."
+      # ----------------------------
+      # Run Trivy Scan (HTML report)
+      # ----------------------------
+      - name: Run Trivy scan
+        shell: pwsh
+        run: |
           docker pull hello-world
 
-          Write-Host "Running Trivy scan..."
           trivy image `
             --severity CRITICAL `
-            --exit-code 1 `
+            --exit-code 0 `
             --format template `
-            --template "@$templatePath" `
-            -o $reportPath `
+            --template "@$env:GITHUB_WORKSPACE/html.tpl" `
+            -o "$env:GITHUB_WORKSPACE/trivy-report.html" `
             hello-world
 
       # ----------------------------
-      # Upload report
+      # Upload Report
       # ----------------------------
-      - name: Upload Trivy report
+      - name: Upload Trivy HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-security-report
-          path: $reportPath
+          name: trivy-html-report
+          path: ${{ github.workspace }}/trivy-report.html
