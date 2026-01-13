@@ -52,7 +52,7 @@ jobs:
           {{- end }}
           "@
 
-          Set-Content -Path "${{ github.workspace }}\trivy-template.tpl" -Value "$template"
+          Set-Content -Path "./trivy-template.tpl" -Value "$template"
           docker pull hello-world
           trivy image --format template --template "@${{ github.workspace }}\trivy-template.tpl" hello-world
     
@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trivy-template
-          path: Set-Content -Path "./trivy-template.tpl" -Value "$template"
+          path: ${{ github.workspace }}\trivy-template.tpl
 
 
                 
