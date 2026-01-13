@@ -9,19 +9,31 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     steps:
+      # ----------------------------
+      # Checkout source code
+      # ----------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ----------------------------
+      # Install Trivy
+      # ----------------------------
       - name: Install Trivy CLI
         uses: ankurk91/install-trivy-cli-action@v2
         with:
-         version: latest # or a specific version like 'v0.64.0'
-         cache: true # or set to false, true by default
-      - name: Run Trivy scan on a container image
+          version: latest
+          cache: true
+
+      # ----------------------------
+      # Create template + Scan image
+      # ----------------------------
+      - name: Run Trivy scan on container image
         shell: pwsh
         run: |
-          #trivy image --severity CRITICAL <ImageName>
+          Write-Host "Creating Trivy template..."
+
           $template = @"
           {{- if .Results }}
           TRIVY SECURITY REPORT
@@ -52,17 +64,28 @@ jobs:
           {{- end }}
           "@
 
-          Set-Content -Path "$env:GITHUB_WORKSPACE/trivy-template.tpl" -Value $template
+          $templatePath = "$env:GITHUB_WORKSPACE/trivy-template.tpl"
+          $reportPath   = "$env:GITHUB_WORKSPACE/trivy-report.txt"
 
+          Set-Content -Path $templatePath -Value $template
+
+          Write-Host "Pulling test image..."
           docker pull hello-world
 
-          trivy image --format template --template "@$env:GITHUB_WORKSPACE/trivy-template.tpl" hello-world
+          Write-Host "Running Trivy scan..."
+          trivy image `
+            --severity CRITICAL `
+            --exit-code 1 `
+            --format template `
+            --template "@$templatePath" `
+            -o $reportPath `
+            hello-world
 
-      - name: Upload artifact
+      # ----------------------------
+      # Upload report
+      # ----------------------------
+      - name: Upload Trivy report
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-template
-          path: ${{ github.workspace }}/trivy-template.tpl
-                
-
-
+          name: trivy-security-report
+          path: $reportPath
