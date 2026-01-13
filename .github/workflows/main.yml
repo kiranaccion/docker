@@ -42,7 +42,7 @@ jobs:
       - name: Run Trivy scan
         shell: pwsh
         run: |
-          docker pull hello-world
+          docker pull vulnerables/web-dvwa
 
           trivy image `
             --severity CRITICAL `
@@ -50,7 +50,7 @@ jobs:
             --format template `
             --template "@$env:GITHUB_WORKSPACE/html.tpl" `
             -o "$env:GITHUB_WORKSPACE/trivy-report.html" `
-            hello-world
+            vulnerables/web-dvwa
 
       # ----------------------------
       # Upload Report
