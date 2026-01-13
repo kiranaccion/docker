@@ -1,4 +1,4 @@
-name: build
+name: Trivy Security Scan
 
 on:
   push:
@@ -7,34 +7,60 @@ on:
   pull_request:
 
 jobs:
-  build:
-    name: Build & Trivy Scan
-    runs-on: ubuntu-24.04
-
+  scan:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Build image from YOUR Dockerfile
-      - name: Build Docker image
-        run: docker build -t trivy-demo:latest .
-
-      # Trivy Image Scan
-      - name: Run Trivy image vulnerability scanner
-        uses: aquasecurity/trivy-action@0.33.1
+      - name: Set up Trivy
+        uses: aquasecurity/setup-trivy@v2
         with:
-          image-ref: trivy-demo:latest
-          format: template
-          template: "@/contrib/html.tpl"
-          output: trivy-image-report.html
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          exit-code: '0'   # ✅ pipeline will NOT fail
+          version: 'latest' # Installs the latest version
 
-      # Upload report
-      - name: Upload Trivy HTML report
+      - name: Run Trivy scan on a container image
+        shell: pwsh
+        run: |
+          #trivy image --severity CRITICAL <ImageName>
+          $template = @"
+          {{- if .Results }}
+          TRIVY SECURITY REPORT
+          =====================
+
+          {{- range .Results }}
+          Target: {{ .Target }}
+          Type: {{ .Type }}
+
+          {{- if .Vulnerabilities }}
+          VULNERABILITIES:
+          {{- range .Vulnerabilities }}
+          ----------------------------------------
+          ID:        {{ .VulnerabilityID }}
+          Package:   {{ .PkgName }}
+          Installed: {{ .InstalledVersion }}
+          Fixed:     {{ .FixedVersion }}
+          Severity:  {{ .Severity }}
+          Title:     {{ .Title }}
+          {{- end }}
+          {{- else }}
+          No vulnerabilities found.
+          {{- end }}
+
+          {{ end }}
+          {{- else }}
+          No scan results.
+          {{- end }}
+          "@
+
+          Set-Content -Path "${{ github.workspace }}\trivy-template.tpl" -Value "$template"
+          docker pull hello-world
+          trivy image --format template --template "@${{ github.workspace }}\trivy-template.tpl" hello-world
+    
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-image-security-report
-          path: trivy-image-report.html
+          name: trivy-template
+          path: ${{ github.workspace }}\trivy-template.tpl
+                
+
+
