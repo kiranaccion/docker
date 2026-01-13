@@ -13,11 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Trivy
-        uses: aquasecurity/setup-trivy@v1
+      - name: Install Trivy CLI
+        uses: ankurk91/install-trivy-cli-action@v2
         with:
-          version: 'latest' # Installs the latest version
-
+         version: latest # or a specific version like 'v0.64.0'
+         cache: true # or set to false, true by default
       - name: Run Trivy scan on a container image
         shell: pwsh
         run: |
