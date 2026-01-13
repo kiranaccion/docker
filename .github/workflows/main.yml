@@ -60,7 +60,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trivy-template
-          path: ${{ github.workspace }}\trivy-template.tpl
+          path: Set-Content -Path "${{ github.workspace }}/trivy-template.tpl" -Value "$template"
+
                 
 
 
