@@ -1,0 +1,165 @@
+name: Dev - Backend + PDF + Orchestrator
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ dev ]
+    paths:
+      - 'Backend/**'
+      - 'PDF-Processing/**'
+      - 'Orchestrator/**'
+
+jobs:
+  build:
+    name: Triggering DEV
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: DEV
+
+    steps:
+      # Detect changed folders
+      - name: Detect Changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'Backend/**'
+            pdf:
+              - 'PDF-Processing/**'
+            orchestrator:
+              - 'Orchestrator/**'
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Free disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/lib/jvm
+          docker system prune -af || true
+          df -h
+
+# ==========================================================
+# BACKEND SECTION
+# ==========================================================
+
+      - name: Login to Azure ACR (Backend)
+        if: steps.changes.outputs.backend == 'true'
+        run: |
+          echo "${{ secrets.AZURE_ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} \
+            -u ${{ secrets.AZURE_ACR_USERNAME }} --password-stdin
+
+      - name: Build Backend Image
+        if: steps.changes.outputs.backend == 'true'
+        run: |
+          docker build \
+            -f Backend/Dockerfile \
+            --build-arg APP_ENV=${{ env.APP_ENV }} \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }} \
+            Backend/
+
+      - name: Push Backend Image
+        if: steps.changes.outputs.backend == 'true'
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }}
+          docker tag ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }} \
+            ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:latest
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:latest
+
+      - name: Deploy Backend to VM
+        if: steps.changes.outputs.backend == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.BACKEND_VM_HOST }}
+          username: ${{ secrets.BACKEND_VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "${{ secrets.AZURE_ACR_PASSWORD }}" | sudo docker login ${{ secrets.ACR_LOGIN_SERVER }} \
+              -u ${{ secrets.AZURE_ACR_USERNAME }} --password-stdin
+
+            sudo docker stop backend-container || true
+            sudo docker rm backend-container || true
+
+            sudo docker pull ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }}
+
+            sudo docker run -d \
+              --name backend-container \
+              --restart unless-stopped \
+              --network host \
+              -v /root/backendlogs:/app/logs \
+              -p 8002:8002 \
+              -e APP_ENV=DEV \
+              -e DD_ENV=dev \
+              -e DD_SERVICE=bldr-d2-backend \
+              ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }}
+
+# ==========================================================
+# PDF PROCESSING SECTION
+# ==========================================================
+
+      - name: Login to Azure ACR (PDF)
+        if: steps.changes.outputs.pdf == 'true'
+        run: |
+          echo "${{ secrets.DEV_AZURE_ACR_PASSWORD }}" | docker login ${{ secrets.DEV_ACR_LOGIN_SERVER }} \
+            -u ${{ secrets.DEV_AZURE_ACR_USERNAME }} --password-stdin
+
+      - name: Build PDF Image
+        if: steps.changes.outputs.pdf == 'true'
+        run: |
+          docker build \
+            -f PDF-Processing/Dockerfile \
+            -t ${{ secrets.DEV_ACR_LOGIN_SERVER }}/pdf-processing-app:${{ github.sha }} \
+            PDF-Processing/
+
+      - name: Push PDF Image
+        if: steps.changes.outputs.pdf == 'true'
+        run: |
+          docker push ${{ secrets.DEV_ACR_LOGIN_SERVER }}/pdf-processing-app:${{ github.sha }}
+
+      - name: Deploy PDF to VM
+        if: steps.changes.outputs.pdf == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEV_PDF_VM_HOST }}
+          username: ${{ secrets.DEV_PDF_VM_USER }}
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          script: |
+            IMAGE="${{ secrets.DEV_ACR_LOGIN_SERVER }}/pdf-processing-app:${{ github.sha }}"
+            sudo docker pull "$IMAGE"
+            sudo docker stop pdf-processing-container || true
+            sudo docker rm pdf-processing-container || true
+
+            sudo docker run -d \
+              --name pdf-processing-container \
+              --restart unless-stopped \
+              --network host \
+              -v /root/pdfprocessinglogs:/app/logs \
+              -e APP_ENV=DEV \
+              "$IMAGE"
+
+# ==========================================================
+# ORCHESTRATOR SECTION (Azure Function)
+# ==========================================================
+
+      - name: Zip Orchestrator
+        if: steps.changes.outputs.orchestrator == 'true'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:GITHUB_WORKSPACE/Orchestrator/*" `
+            -DestinationPath "$env:GITHUB_WORKSPACE/Orchestrator.zip"
+
+      - name: Deploy Azure Function
+        if: steps.changes.outputs.orchestrator == 'true'
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.DEV_AZURE_FUNCTIONAPP_NAME }}
+          package: "${{ github.workspace }}/Orchestrator.zip"
+          publish-profile: ${{ secrets.DEV_AZURE_PUBLISH_PROFILE }}
