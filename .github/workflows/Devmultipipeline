@@ -8,7 +8,6 @@ on:
       - 'Backend/**'
       - 'PDF-Processing/**'
       - 'Orchestrator/**'
-
 jobs:
   build:
     name: Triggering DEV
