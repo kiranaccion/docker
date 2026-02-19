@@ -23,11 +23,11 @@ jobs:
         id: changes
         with:
           filters: |
-            backend:
+            Backend:
               - 'Backend/**'
-            pdf:
+            PDF:
               - 'PDF-Processing/**'
-            orchestrator:
+            Orchestrator:
               - 'Orchestrator/**'
 
       - name: Checkout Repo
