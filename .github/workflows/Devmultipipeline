@@ -51,13 +51,13 @@ jobs:
 # ==========================================================
 
       - name: Login to Azure ACR (Backend)
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.Backend == 'true'
         run: |
           echo "${{ secrets.AZURE_ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} \
             -u ${{ secrets.AZURE_ACR_USERNAME }} --password-stdin
 
       - name: Build Backend Image
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.Backend == 'true'
         run: |
           docker build \
             -f Backend/Dockerfile \
@@ -66,7 +66,7 @@ jobs:
             Backend/
 
       - name: Push Backend Image
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.Backend == 'true'
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }}
           docker tag ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:${{ github.sha }} \
@@ -74,7 +74,7 @@ jobs:
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend-app:latest
 
       - name: Deploy Backend to VM
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.Backend == 'true'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.BACKEND_VM_HOST }}
@@ -105,13 +105,13 @@ jobs:
 # ==========================================================
 
       - name: Login to Azure ACR (PDF)
-        if: steps.changes.outputs.pdf == 'true'
+        if: steps.changes.outputs.PDF == 'true'
         run: |
           echo "${{ secrets.DEV_AZURE_ACR_PASSWORD }}" | docker login ${{ secrets.DEV_ACR_LOGIN_SERVER }} \
             -u ${{ secrets.DEV_AZURE_ACR_USERNAME }} --password-stdin
 
       - name: Build PDF Image
-        if: steps.changes.outputs.pdf == 'true'
+        if: steps.changes.outputs.PDF == 'true'
         run: |
           docker build \
             -f PDF-Processing/Dockerfile \
@@ -119,12 +119,12 @@ jobs:
             PDF-Processing/
 
       - name: Push PDF Image
-        if: steps.changes.outputs.pdf == 'true'
+        if: steps.changes.outputs.PDF == 'true'
         run: |
           docker push ${{ secrets.DEV_ACR_LOGIN_SERVER }}/pdf-processing-app:${{ github.sha }}
 
       - name: Deploy PDF to VM
-        if: steps.changes.outputs.pdf == 'true'
+        if: steps.changes.outputs.PDF == 'true'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEV_PDF_VM_HOST }}
@@ -149,14 +149,14 @@ jobs:
 # ==========================================================
 
       - name: Zip Orchestrator
-        if: steps.changes.outputs.orchestrator == 'true'
+        if: steps.changes.outputs.Orchestrator == 'true'
         shell: pwsh
         run: |
           Compress-Archive -Path "$env:GITHUB_WORKSPACE/Orchestrator/*" `
             -DestinationPath "$env:GITHUB_WORKSPACE/Orchestrator.zip"
 
       - name: Deploy Azure Function
-        if: steps.changes.outputs.orchestrator == 'true'
+        if: steps.changes.outputs.Orchestrator == 'true'
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ secrets.DEV_AZURE_FUNCTIONAPP_NAME }}
